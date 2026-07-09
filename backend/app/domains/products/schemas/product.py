@@ -4,7 +4,6 @@ from pydantic import BaseModel, ConfigDict
 class ProductCreate(BaseModel):
     brand_id: int
     name: str
-    slug: str
     protein_type: str
     flavour: str
     weight: float
@@ -29,7 +28,6 @@ class ProductResponse(BaseModel):
 class ProductUpdate(BaseModel):
     brand_id: int | None = None
     name: str | None = None
-    slug: str | None = None
     protein_type: str | None = None
     flavour: str | None = None
     weight: float | None = None

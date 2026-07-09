@@ -9,6 +9,12 @@ class StoreCreate(BaseModel):
     active: bool = True
 
 
+class StoreUpdate(BaseModel):
+    name: str | None = None
+    base_url: str | None = None
+    active: bool | None = None
+
+
 class StoreResponse(BaseModel):
     id: int
     name: str
@@ -24,6 +30,14 @@ class ListingCreate(BaseModel):
     url: str
     current_price: float
     availability: bool = True
+
+
+class ListingUpdate(BaseModel):
+    product_id: int | None = None
+    store_id: int | None = None
+    url: str | None = None
+    current_price: float | None = None
+    availability: bool | None = None
 
 
 class ListingResponse(BaseModel):
