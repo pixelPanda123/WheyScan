@@ -24,6 +24,15 @@ class BrandRepository:
     def get_by_name(self, name: str):
         stmt = select(Brand).where(Brand.name == name)
         return self.db.scalar(stmt)
+
+    def get_or_create(self, name: str) -> Brand:
+        brand = self.get_by_name(name)
+
+        if brand:
+            return brand
+
+        brand = Brand(name=name)
+        return self.create(brand)
     def update(self, brand: Brand):
         self.db.commit()
         self.db.refresh(brand)

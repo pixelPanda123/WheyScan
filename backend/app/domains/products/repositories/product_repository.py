@@ -43,3 +43,4 @@ class ProductRepository:
     def delete(self, product: Product) -> None:
         self.db.delete(product)
         self.db.commit()
+# Need to write get_or_create function, will do once after i complete define what uniquely identifies a product

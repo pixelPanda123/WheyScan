@@ -46,6 +46,7 @@ class StoreRepository:
 
 
 class ListingRepository:
+    #Need to add get_or_create function, so do that later. 
 
     def __init__(self, db: Session):
         self.db = db
@@ -99,6 +100,7 @@ class ListingRepository:
 
 
 class PriceHistoryRepository:
+    #Need to add record_price(listing, price) function
 
     def __init__(self, db: Session):
         self.db = db
