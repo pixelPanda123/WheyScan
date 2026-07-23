@@ -1,4 +1,5 @@
 import requests
+from typing import Optional
 
 
 class HTTPClient:
@@ -16,9 +17,17 @@ class HTTPClient:
             }
         )
 
-    def get(self, url: str) -> requests.Response:
+    def get(
+        self,
+        url: str,
+        *,
+        params: Optional[dict] = None,
+        headers: Optional[dict] = None,
+    ) -> requests.Response:
         response = self.session.get(
             url,
+            params=params,
+            headers=headers,
             timeout=self.timeout,
         )
 
