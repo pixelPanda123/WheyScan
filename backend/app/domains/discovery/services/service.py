@@ -37,4 +37,77 @@ class DiscoveryService:
             limit=limit,
         )
 
-        return [DiscoveryResult.model_validate(row) for row in rows]
+        products: dict[int, dict] = {}
+
+        for row in rows:
+            product_id = row["product_id"]
+            product = products.setdefault(
+                product_id,
+                {
+                    "id": product_id,
+                    "product_id": product_id,
+                    "name": row["name"],
+                    "brand": row["brand_name"],
+                    "brand_id": row["brand_id"],
+                    "brand_name": row["brand_name"],
+                    "slug": row["slug"],
+                    "protein_type": row["protein_type"],
+                    "flavour": row["flavour"],
+                    "weight": row["weight"],
+                    "weight_unit": row["weight_unit"],
+                    "image_url": row["image_url"],
+                    "listings": [],
+                },
+            )
+
+            product["listings"].append(
+                {
+                    "listing_id": row["listing_id"],
+                    "store_id": row["store_id"],
+                    "store_name": row["store_name"],
+                    "current_price": row["current_price"],
+                    "price_per_100g": self._price_per_100g(
+                        row["current_price"],
+                        row["weight"],
+                        row["weight_unit"],
+                    ),
+                    "availability": row["availability"],
+                    "product_url": row["product_url"],
+                }
+            )
+
+        return [
+            DiscoveryResult.model_validate(product)
+            for product in products.values()
+        ]
+
+    @staticmethod
+    def _price_per_100g(
+        price: float | None,
+        weight: float | None,
+        weight_unit: str | None,
+    ) -> float | None:
+        if price is None or weight is None or not weight_unit:
+            return None
+
+        unit = weight_unit.strip().lower()
+        grams_by_unit = {
+            "g": 1,
+            "gm": 1,
+            "gram": 1,
+            "grams": 1,
+            "kg": 1000,
+            "kgs": 1000,
+            "lb": 453.59237,
+            "lbs": 453.59237,
+        }
+        grams_multiplier = grams_by_unit.get(unit)
+
+        if grams_multiplier is None:
+            return None
+
+        grams = float(weight) * grams_multiplier
+        if grams <= 0:
+            return None
+
+        return round(float(price) / grams * 100, 2)
