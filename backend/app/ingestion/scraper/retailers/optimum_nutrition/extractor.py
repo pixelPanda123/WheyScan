@@ -60,7 +60,10 @@ class OptimumNutritionExtractor:
 
             weight=weight,
             flavour=flavour,
-            protein_type=self._extract_protein_type(tags),
+            # ON tags are merchandising (collections, cross-sells) and give
+            # the same product different types per size. The normalizer
+            # derives protein type from the product's own title instead.
+            protein_type=None,
 
             current_price=float(variant["price"]),
 
@@ -128,27 +131,3 @@ class OptimumNutritionExtractor:
         ]
 
         return cls._classify([value for value in values if value])
-
-    def _extract_protein_type(self, tags: str):
-
-        tags = tags.lower()
-
-        if "mass gainer" in tags:
-            return "MASS_GAINER"
-
-        if "casein" in tags:
-            return "CASEIN"
-
-        if "plant protein" in tags:
-            return "PLANT"
-
-        if "whey isolate" in tags:
-            return "WHEY_ISOLATE"
-
-        if "whey concentrate" in tags:
-            return "WHEY_CONCENTRATE"
-
-        if "whey protein" in tags:
-            return "WHEY"
-
-        return None

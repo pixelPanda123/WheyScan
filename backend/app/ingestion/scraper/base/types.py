@@ -14,6 +14,9 @@ class RawProduct:
 
     weight: Optional[str]
     flavour: Optional[str]
+    # The retailer's *structured* protein attribute only (e.g. HealthKart's
+    # "Protein Type"). Leave None rather than guessing from tags or text;
+    # the normalizer falls back to the product name.
     protein_type: Optional[str]
 
     current_price: float

@@ -115,30 +115,38 @@ def test_healthkart_first_run_and_rerun(db, healthkart_products):
     }
 
 
-def test_optimum_nutrition_first_run_reports_new_listings(
+def test_optimum_nutrition_first_run_joins_healthkart_canonical_product(
     db, healthkart_products, on_client, on_products
 ):
     ingest(db, "healthkart", healthkart_products)
+    hk_gold_standard = db.scalar(
+        select(Listing).where(Listing.retailer_product_id == "143771")
+    ).product
 
     stats = ingest(db, "optimum_nutrition", on_items(on_client, on_products))
 
-    # Five listings are created for the ON store and each gets its first price.
-    assert stats["new_listings"] == 5
-    assert stats["price_changes"] == 5
-    assert stats["new_products"] + stats["matched_existing"] == 5
+    # 907 g Double Rich Chocolate is the same product HealthKart sells;
+    # the other four sizes differ by weight and are new products.
+    assert summary(stats) == {
+        "seen": 5, "ingested": 5, "new_products": 4, "matched_existing": 1,
+        "new_listings": 5, "updated_listings": 0, "price_changes": 5,
+    }
 
     listings = db.scalars(
         select(Listing).join(Store).where(Store.name == "optimum_nutrition")
     ).all()
-    assert len(listings) == 5
+    by_weight = {int(l.product.weight): l.product for l in listings}
 
-    for listing in listings:
-        product = listing.product
-        assert product.name == "Gold Standard 100%"
-        assert "|" not in product.name
+    assert sorted(by_weight) == [152, 454, 907, 1700, 2270]
+    assert by_weight[907].id == hk_gold_standard.id
+    assert all(p.id != hk_gold_standard.id for w, p in by_weight.items() if w != 907)
+
+    for product in by_weight.values():
+        assert product.name == "Gold Standard 100% Whey"
         assert product.flavour == "Chocolate"
 
-    assert sorted(int(l.product.weight) for l in listings) == [152, 454, 907, 1700, 2270]
+    # The canonical product keeps HealthKart's structured classification.
+    assert hk_gold_standard.protein_type == "WHEY_BLEND"
 
 
 def test_optimum_nutrition_rerun_matches_its_own_listings(

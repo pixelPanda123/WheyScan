@@ -45,18 +45,19 @@ def test_full_on_title_normalizes_to_product_name(title):
         raw(title, "Optimum Nutrition", flavour="Double Rich Chocolate")
     )
 
-    assert normalized.name == "Gold Standard 100%"
+    # Protein-form words ("Whey") are kept; filler ("Protein", "Powder") is not.
+    assert normalized.name == "Gold Standard 100% Whey"
     assert normalized.flavour == "Chocolate"
 
 
 @pytest.mark.parametrize(
     "name, expected",
     [
-        ("Some Whey 5 lbs", "Some"),        # used to leave a stray "s"
-        ("Some Whey 2lbs", "Some"),
-        ("Some Whey 1000 gm", "Some"),      # used to leave a stray "m"
-        ("Some Whey 2.27 kg", "Some"),
-        ("Some Whey 152 g (5.36 oz)", "Some"),
+        ("Some Whey 5 lbs", "Some Whey"),        # used to leave a stray "s"
+        ("Some Whey 2lbs", "Some Whey"),
+        ("Some Whey 1000 gm", "Some Whey"),      # used to leave a stray "m"
+        ("Some Whey 2.27 kg", "Some Whey"),
+        ("Some Whey 152 g (5.36 oz)", "Some Whey"),
     ],
 )
 def test_weight_units_removed_completely(name, expected):
@@ -67,12 +68,12 @@ def test_raw_flavour_removed_before_normalized_flavour():
     # Normalized flavour is "Chocolate"; removing only that left "Double Rich".
     assert (
         NameNormalizer.normalize(
-            "Gold Standard 100% Double Rich Chocolate",
+            "Gold Standard 100% Whey Double Rich Chocolate",
             "Optimum Nutrition",
             "Chocolate",
             raw_flavour="Double Rich Chocolate",
         )
-        == "Gold Standard 100%"
+        == "Gold Standard 100% Whey"
     )
 
 
@@ -82,19 +83,33 @@ def test_empty_separator_segments_dropped():
     )
 
 
-# HealthKart names must normalize exactly as before (these match the product
-# names already stored from HealthKart runs).
+# HealthKart names: same cleanup as before, but protein-form words are now
+# kept, so existing HealthKart products need re-ingesting (see cleanup steps).
 @pytest.mark.parametrize(
     "name, brand, flavour, expected",
     [
-        ("MuscleBlaze Biozyme Performance Whey", "MuscleBlaze", "Rich Chocolate", "Biozyme Performance"),
-        ("Ronnie Coleman Pro-Antium Whey Protein", "Ronnie Coleman", "Chocolate", "Pro-Antium"),
-        ("MuscleBlaze Biozyme Gold 100% Whey", "MuscleBlaze", "Rich Milk Chocolate", "Biozyme Gold 100%"),
-        ("MuscleBlaze Biozyme Whey PR", "MuscleBlaze", "Rich Chocolate", "Biozyme PR"),
-        ("Optimum Nutrition Gold Standard 100% Whey Protein", "ON", "Double Rich Chocolate", "Gold Standard 100%"),
+        ("MuscleBlaze Biozyme Performance Whey", "MuscleBlaze", "Rich Chocolate", "Biozyme Performance Whey"),
+        ("Ronnie Coleman Pro-Antium Whey Protein", "Ronnie Coleman", "Chocolate", "Pro-Antium Whey"),
+        ("MuscleBlaze Biozyme Gold 100% Whey", "MuscleBlaze", "Rich Milk Chocolate", "Biozyme Gold 100% Whey"),
+        ("MuscleBlaze Biozyme Whey PR", "MuscleBlaze", "Rich Chocolate", "Biozyme Whey PR"),
+        ("Optimum Nutrition Gold Standard 100% Whey Protein", "ON", "Double Rich Chocolate", "Gold Standard 100% Whey"),
     ],
 )
-def test_healthkart_names_unchanged(name, brand, flavour, expected):
+def test_healthkart_names(name, brand, flavour, expected):
     normalized = ProductNormalizer.normalize(raw(name, brand, flavour=flavour))
 
     assert normalized.name == expected
+
+
+@pytest.mark.parametrize(
+    "name, expected",
+    [
+        ("Gold Standard 100% Isolate", "Gold Standard 100% Isolate"),
+        ("MuscleBlaze Raw Whey Protein Concentrate 80%", "Raw Whey Concentrate 80%"),
+        ("Gold Standard 100% Casein Protein", "Gold Standard 100% Casein"),
+        ("Dymatize ISO 100 Hydrolyzed Whey Protein Isolate", "ISO 100 Hydrolyzed Whey Isolate"),
+    ],
+)
+def test_protein_form_words_kept_in_name(name, expected):
+    brand = name.split()[0] if name.startswith(("MuscleBlaze", "Dymatize")) else "Optimum Nutrition"
+    assert ProductNormalizer.normalize(raw(name, brand)).name == expected
