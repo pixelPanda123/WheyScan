@@ -44,6 +44,7 @@ class ListingResponse(BaseModel):
     id: int
     product_id: int
     store_id: int
+    retailer_product_id: str | None = None
     url: str
     current_price: float
     availability: bool

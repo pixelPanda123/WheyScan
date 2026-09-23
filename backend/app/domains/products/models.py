@@ -49,20 +49,25 @@ class Product(Base):
         index=True,
     )
 
-    protein_type: Mapped[str] = mapped_column(
-        String(50)
+    # Scraped data often lacks these, so they are optional.
+    protein_type: Mapped[str | None] = mapped_column(
+        String(50),
+        nullable=True,
     )
 
-    flavour: Mapped[str] = mapped_column(
-        String(100)
+    flavour: Mapped[str | None] = mapped_column(
+        String(100),
+        nullable=True,
     )
 
-    weight: Mapped[float] = mapped_column(
-        Numeric(6, 2)
+    weight: Mapped[float | None] = mapped_column(
+        Numeric(6, 2),
+        nullable=True,
     )
 
-    weight_unit: Mapped[str] = mapped_column(
-        String(10)
+    weight_unit: Mapped[str | None] = mapped_column(
+        String(10),
+        nullable=True,
     )
 
     image_url: Mapped[str | None] = mapped_column(
