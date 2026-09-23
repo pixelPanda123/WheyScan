@@ -19,11 +19,13 @@ from dataclasses import dataclass
 from itertools import islice
 from typing import Callable, Iterator
 
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 import app.db.models  # noqa: F401  (register all mappers)
 from app.db.session import SessionLocal, engine
-from app.domains.listings.models import Store
+from app.domains.listings.models import Listing, Store
+from app.domains.products.models import Product
 from app.ingestion.scraper.base.types import RawProduct
 from app.ingestion.scraper.http.client import HTTPClient
 from app.ingestion.scraper.retailers.healthkart.discovery import HealthKartDiscoverer
@@ -34,7 +36,7 @@ from app.ingestion.scraper.retailers.optimum_nutrition.discovery import (
 from app.ingestion.scraper.retailers.optimum_nutrition.extractor import (
     OptimumNutritionExtractor,
 )
-from app.ingestion.services.ingestion_service import IngestionService
+from app.ingestion.services.ingestion_service import IngestionService, IngestResult
 
 log = logging.getLogger("ingestion")
 
@@ -55,9 +57,9 @@ def _muscleblaze(client: HTTPClient, stats: Counter, delay: float):
 
 
 def _optimum_nutrition(client: HTTPClient, stats: Counter, delay: float):
-    extractor = OptimumNutritionExtractor()
+    extractor = OptimumNutritionExtractor(client)
 
-    for url in OptimumNutritionDiscoverer().discover():
+    for url in OptimumNutritionDiscoverer(client).discover():
         try:
             yield extractor.extract(url)
         except Exception as exc:  # one broken product page shouldn't stop the run
@@ -106,7 +108,7 @@ def ingest_retailer(
     dry_run: bool,
 ) -> Counter:
 
-    stats: Counter = Counter()
+    stats = new_stats()
     products = source.iter_products(client, stats, delay)
 
     if limit:
@@ -125,20 +127,102 @@ def ingest_retailer(
             log.warning("ingest failed [%s] %s: %s", source.store_name, raw.name, exc)
             continue
 
-        if result is None:
-            stats["filtered_out"] += 1
-            continue
+        tally(stats, result)
 
-        stats["ingested"] += 1
-        stats["new_products"] += result.created_product
-        stats["matched_existing"] += not result.created_product
-        stats["new_listings"] += result.created_listing
-        stats["price_changes"] += result.price_changed
-
-        if not dry_run:
+        if result is not None and not dry_run:
             db.commit()
 
     return stats
+
+
+# Every key is always present, so a summary never silently omits a count.
+STAT_KEYS = (
+    "seen",
+    "scrape_failed",
+    "filtered_out",
+    "failed",
+    "ingested",
+    "new_products",
+    "matched_existing",
+    "new_listings",
+    "updated_listings",
+    "price_changes",
+)
+
+
+def new_stats() -> Counter:
+    return Counter({key: 0 for key in STAT_KEYS})
+
+
+def tally(stats: Counter, result: IngestResult | None) -> None:
+    """Add one IngestResult to the run summary (`seen`/`failed` are counted by the caller)."""
+
+    if result is None:
+        stats["filtered_out"] += 1
+        return
+
+    stats["ingested"] += 1
+
+    if result.created_product:
+        stats["new_products"] += 1
+    else:
+        stats["matched_existing"] += 1
+
+    if result.created_listing:
+        stats["new_listings"] += 1
+    else:
+        stats["updated_listings"] += 1
+
+    if result.price_changed:
+        stats["price_changes"] += 1
+
+
+def db_counts(db: Session, store_name: str) -> dict[str, int]:
+    """Row counts used to check the run summary against the database."""
+
+    listings = db.scalar(
+        select(func.count(Listing.id))
+        .join(Store, Store.id == Listing.store_id)
+        .where(Store.name == store_name)
+    )
+    products = db.scalar(select(func.count(Product.id)))
+
+    return {"products": products or 0, "listings": listings or 0}
+
+
+def check_against_db(
+    store_name: str,
+    stats: Counter,
+    before: dict[str, int],
+    after: dict[str, int],
+) -> bool:
+    """Log the row changes and warn if they disagree with the counters."""
+
+    added_products = after["products"] - before["products"]
+    added_listings = after["listings"] - before["listings"]
+
+    log.info(
+        "%s: database change: +%d products, +%d %s listings",
+        store_name,
+        added_products,
+        added_listings,
+        store_name,
+    )
+
+    ok = (
+        added_products == stats["new_products"]
+        and added_listings == stats["new_listings"]
+    )
+
+    if not ok:
+        log.warning(
+            "%s: summary disagrees with database (new_products=%d, new_listings=%d)",
+            store_name,
+            stats["new_products"],
+            stats["new_listings"],
+        )
+
+    return ok
 
 
 def main(argv: list[str] | None = None) -> None:
@@ -172,6 +256,7 @@ def main(argv: list[str] | None = None) -> None:
 
         for name in names:
             log.info("=== %s ===", name)
+            before = db_counts(db, SOURCES[name].store_name)
             stats = ingest_retailer(
                 db,
                 service,
@@ -182,6 +267,12 @@ def main(argv: list[str] | None = None) -> None:
                 dry_run=args.dry_run,
             )
             log.info("%s: %s", name, dict(stats))
+            check_against_db(
+                SOURCES[name].store_name,
+                stats,
+                before,
+                db_counts(db, SOURCES[name].store_name),
+            )
 
         if args.dry_run:
             db.rollback()

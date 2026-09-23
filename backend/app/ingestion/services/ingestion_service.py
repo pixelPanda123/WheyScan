@@ -28,6 +28,9 @@ class IngestResult:
     created_listing: bool
     price_changed: bool
     match_score: float
+    # How the canonical product was found: "listing" (this retailer item was
+    # ingested before), "catalog" (fuzzy match) or "new" (product created).
+    resolved_by: str
 
 
 class IngestionService:
@@ -78,31 +81,31 @@ class IngestionService:
         # 3. Store
         store = self._get_store(normalized.retailer)
 
-        # 4. Match against canonical catalog
-        catalog = self._get_catalog()
+        # 4. Resolve the canonical Product. A retailer item we've already
+        #    ingested keeps its product: the retailer's own ID is a stronger
+        #    identity than a fuzzy name match, and re-matching could create a
+        #    duplicate product whenever normalization rules change.
+        known_listing = self._find_listing_by_retailer_id(store, normalized)
 
-        matched, score = ProductMatcher.match(
-            normalized,
-            [entry[1] for entry in catalog],
-        )
-
-        # 5. Resolve canonical Product
-        if matched is not None:
-            product = next(p for p, n in catalog if n is matched)
+        if known_listing is not None:
+            product = known_listing.product
             created_product = False
+            match_score = 1.0
+            resolved_by = "listing"
         else:
-            product = self._create_product(normalized)
-            catalog.append((product, self._product_to_normalized(product)))
-            created_product = True
+            product, created_product, match_score = self._match_or_create(
+                normalized
+            )
+            resolved_by = "new" if created_product else "catalog"
 
-        # 6. Listing
+        # 5. Listing
         listing, created_listing = self._upsert_listing(
             product,
             store,
             normalized,
         )
 
-        # 7. Price history
+        # 6. Price history
         price_changed = self._update_price_history(listing, normalized)
 
         return IngestResult(
@@ -111,8 +114,44 @@ class IngestionService:
             created_product=created_product,
             created_listing=created_listing,
             price_changed=price_changed,
-            match_score=score.score,
+            match_score=match_score,
+            resolved_by=resolved_by,
         )
+
+    def _find_listing_by_retailer_id(
+        self,
+        store: Store,
+        normalized: NormalizedProduct,
+    ) -> Listing | None:
+
+        if not normalized.retailer_product_id:
+            return None
+
+        return self.listing_repo.get_by_store_and_retailer_product_id(
+            store.id,
+            normalized.retailer_product_id,
+        )
+
+    def _match_or_create(
+        self,
+        normalized: NormalizedProduct,
+    ) -> tuple[Product, bool, float]:
+
+        catalog = self._get_catalog()
+
+        matched, score = ProductMatcher.match(
+            normalized,
+            [entry[1] for entry in catalog],
+        )
+
+        if matched is not None:
+            product = next(p for p, n in catalog if n is matched)
+            return product, False, score.score
+
+        product = self._create_product(normalized)
+        catalog.append((product, self._product_to_normalized(product)))
+
+        return product, True, score.score
 
     def reset_cache(self) -> None:
         self._stores.clear()
