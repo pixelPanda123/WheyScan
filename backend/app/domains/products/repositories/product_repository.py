@@ -44,7 +44,7 @@ class ProductRepository:
         self.db.delete(product)
         self.db.commit()
 
-    def get_all(self)-> list[Product]:
+    # Quoted: inside this class body, `list` refers to the list() method above.
+    def get_all(self) -> "list[Product]":
         stmt = select(Product).order_by(Product.id)
         return list(self.db.scalars(stmt).all())
-# Need to write get_or_create function, will do once after i complete define what uniquely identifies a product

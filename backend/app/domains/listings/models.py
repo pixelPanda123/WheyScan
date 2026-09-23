@@ -52,6 +52,11 @@ class Listing(Base):
             "product_id",
             "store_id",
         ),
+        UniqueConstraint(
+            "store_id",
+            "retailer_product_id",
+            name="uq_listings_store_retailer_product_id",
+        ),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -62,6 +67,13 @@ class Listing(Base):
 
     store_id: Mapped[int] = mapped_column(
         ForeignKey("stores.id")
+    )
+
+    # The retailer's own ID for this item (e.g. Shopify / HealthKart variant ID).
+    retailer_product_id: Mapped[str | None] = mapped_column(
+        String(100),
+        nullable=True,
+        index=True,
     )
 
     url: Mapped[str] = mapped_column(String)
