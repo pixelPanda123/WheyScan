@@ -45,7 +45,7 @@ class VeronicaParser:
             discount=product.get("discount"),
 
             product_url=base_url + product.get("urlFragment", ""),
-            image_url=product.get("m_img"),
+            image_url=(product.get("m_img")or {}).get("m_link"),
 
             availability="In Stock"
             if not product.get("oos", False)
