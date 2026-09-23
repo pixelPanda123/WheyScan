@@ -10,8 +10,8 @@ class OptimumNutritionDiscoverer:
 
     SITEMAP_INDEX = "https://www.optimumnutrition.co.in/sitemap.xml"
 
-    def __init__(self):
-        self.client = HTTPClient()
+    def __init__(self, client: HTTPClient | None = None):
+        self.client = client or HTTPClient()
 
     def discover(self) -> list[str]:
         """

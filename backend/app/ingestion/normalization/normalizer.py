@@ -28,6 +28,7 @@ class ProductNormalizer:
             raw.name,
             brand,
             flavour,
+            raw_flavour=raw.flavour,
         )
 
         return NormalizedProduct(
