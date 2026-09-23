@@ -4,7 +4,11 @@ PROTEIN_KEYWORDS = {
     "isolate",
     "hydro",
     "casein",
+}
+
+MASS_GAINER_KEYWORDS = {
     "mass gainer",
+    "weight gainer",
     "gainer",
 }
 

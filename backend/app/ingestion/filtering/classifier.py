@@ -28,6 +28,10 @@ class ProductClassifier:
         if any(word in text for word in VITAMIN_KEYWORDS):
             return ProductKind.VITAMIN
 
+        # Before protein: gainer names usually also contain "protein"/"whey".
+        if any(word in text for word in MASS_GAINER_KEYWORDS):
+            return ProductKind.MASS_GAINER
+
         if any(word in text for word in PROTEIN_KEYWORDS):
             return ProductKind.PROTEIN
 

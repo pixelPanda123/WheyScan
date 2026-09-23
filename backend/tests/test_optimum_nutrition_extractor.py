@@ -36,7 +36,7 @@ def test_extracts_name_weight_flavour_into_separate_fields(on_client, sku):
 
     normalized = ProductNormalizer.normalize(raw)
 
-    assert normalized.name == "Gold Standard 100%"
+    assert normalized.name == "Gold Standard 100% Whey"
     assert normalized.weight_g == grams
     assert normalized.flavour == "Chocolate"
     assert normalized.brand == "Optimum Nutrition"
@@ -83,3 +83,32 @@ def test_falls_back_to_title_when_x_tags_missing(on_products):
     assert raw.name == "Gold Standard 100% Whey Protein Powder"
     assert raw.weight == "1 lbs"
     assert raw.flavour == "Double Rich Chocolate"
+
+
+@pytest.mark.parametrize("sku", sorted(EXPECTED))
+def test_merchandising_tags_do_not_set_protein_type(on_client, sku):
+    # These tags include "Whey concentrate", "Whey Isolate" and "ON Gold
+    # Standard Isolate" collections, which used to yield CONCENTRATE /
+    # ISOLATE / WHEY for the same product line.
+    raw = OptimumNutritionExtractor(on_client).extract(SKU_URL.format(sku))
+
+    assert raw.protein_type is None
+    # Title says only "Whey": no specific form, so unknown (not a guess).
+    assert ProductNormalizer.normalize(raw).protein_type is None
+
+
+def test_protein_type_ignores_tags_even_when_they_claim_isolate(on_client, on_products):
+    url = SKU_URL.format("1118948")
+    product = dict(on_products[url]["product"])
+    product["tags"] = product["tags"] + ", Whey Isolate, isolate, casein"
+
+    class Client:
+        def get(self, url, **kwargs):
+            class Response:
+                def json(self):
+                    return {"product": product}
+            return Response()
+
+    raw = OptimumNutritionExtractor(Client()).extract(url)
+
+    assert ProductNormalizer.normalize(raw).protein_type is None

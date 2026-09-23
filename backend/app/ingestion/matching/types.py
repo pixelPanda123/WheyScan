@@ -10,6 +10,8 @@ class ProductFingerprint:
     weight_g: int | None
     flavour: str | None
     protein_type: str | None
+    # Protein form stated in the product's own name (see detect_form).
+    name_form: str | None = None
 
 
 @dataclass(slots=True)

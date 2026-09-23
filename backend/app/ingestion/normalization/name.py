@@ -14,14 +14,13 @@ SEPARATOR_PATTERN = re.compile(r"[|,]")
 
 class NameNormalizer:
 
+    # Filler only. Protein-form words (whey, isolate, concentrate,
+    # hydrolysed, casein, blend) stay in the name: they are what tells
+    # "Gold Standard 100% Whey" apart from "Gold Standard 100% Isolate".
     REMOVE_WORDS = {
         "protein",
         "powder",
         "100%",
-        "whey",
-        "isolate",
-        "concentrate",
-        "blend",
     }
 
     @classmethod
