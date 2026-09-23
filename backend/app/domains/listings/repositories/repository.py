@@ -89,6 +89,13 @@ class ListingRepository:
         )
         return list(self.db.scalars(stmt).all())
 
+    def get_by_store_and_retailer_product_id(self, store_id: int, retailer_product_id: str,) -> Listing | None:
+        stmt = select(Listing).where(
+            Listing.store_id == store_id,
+            Listing.retailer_product_id == retailer_product_id,
+        )
+        return self.db.scalar(stmt)
+
     def update(self, listing: Listing) -> Listing:
         self.db.commit()
         self.db.refresh(listing)
